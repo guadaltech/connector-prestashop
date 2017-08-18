@@ -2,17 +2,22 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 
-from openerp.addons.connector.queue.job import job
-from openerp.addons.connector.unit.mapper import (mapping,
+from odoo.addons.queue_job.job import job
+from odoo.addons.connector.unit.mapper import (mapping,
                                                   ImportMapper)
 
 from ...backend import prestashop
 from ...unit.importer import PrestashopImporter
 
+from ...unit.importer import (
+    DelayedBatchImporter,
+    import_batch,
+)
+
 import mimetypes
 import logging
 
-from openerp import _
+from odoo import _
 
 _logger = logging.getLogger(__name__)
 try:
@@ -32,7 +37,7 @@ class ProductImageMapper(ImportMapper):
     @mapping
     def from_template(self, record):
         binder = self.binder_for('prestashop.product.template')
-        template = binder.to_odoo(record['id_product'], unwrap=True)
+        template = binder.to_internal(record['id_product'], unwrap=True)
         name = '%s_%s' % (template.name, record['id_image'])
         return {'owner_id': template.id, 'name': name}
 
@@ -80,7 +85,7 @@ class ProductImageImporter(PrestashopImporter):
             super(ProductImageImporter, self).run(image_id, **kwargs)
         except PrestaShopWebServiceError as error:
             binder = self.binder_for('prestashop.product.template')
-            template = binder.to_odoo(template_id, unwrap=True)
+            template = binder.to_internal(template_id, unwrap=True)
             if template:
                 msg = _(
                     'Import of image id `%s` failed. '
@@ -97,7 +102,6 @@ class ProductImageImporter(PrestashopImporter):
                     'Error: `%s`'
                 ) % (image_id, template_id, error.msg)
                 self.backend_record.add_checkpoint(message=msg)
-
 
 @job(default_channel='root.prestashop')
 def import_product_image(session, model_name, backend_id, product_tmpl_id,
@@ -118,3 +122,7 @@ def set_product_image_variant(
     env = backend.get_environment(model_name, session=session)
     importer = env.get_connector_unit(PrestashopImporter)
     importer.set_variant_images(combination_ids, **kwargs)
+
+@prestashop
+class ImageBatchImporter(DelayedBatchImporter):
+    _model_name = 'prestashop.product.image'

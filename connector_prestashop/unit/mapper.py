@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from openerp.addons.connector.unit.mapper import ExportMapper
-from openerp.addons.connector.unit.mapper import mapping
-
+from odoo.addons.connector.unit.mapper import ExportMapper
+from odoo.addons.connector.unit.mapper import mapping
 
 class PrestashopExportMapper(ExportMapper):
 
@@ -12,13 +11,12 @@ class PrestashopExportMapper(ExportMapper):
                                                               from_attr,
                                                               to_attr) or ''
         if isinstance(from_attr, basestring):
-            column = self.model._all_columns[from_attr].column
-            if column._type == 'boolean':
+            column = self.model._fields[from_attr].type
+            if str(column) == 'boolean':
                 return res and 1 or 0
-            elif column._type == 'float':
+            elif str(column) == 'float':
                 res = str(res)
         return res
-
 
 class TranslationPrestashopExportMapper(PrestashopExportMapper):
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from openerp import models, fields
+from odoo import models, fields
 
 from ...unit.backend_adapter import GenericAdapter
 
@@ -15,6 +15,10 @@ class ProductCategory(models.Model):
         comodel_name='prestashop.product.category',
         inverse_name='odoo_id',
         string="PrestaShop Bindings",
+    )
+
+    sequence = fields.Integer(
+        string = 'Sequence'
     )
 
 

@@ -7,11 +7,11 @@ from contextlib import contextmanager
 import psycopg2
 
 
-from openerp import _, exceptions
-from openerp.addons.connector.queue.job import job
-from openerp.addons.connector.queue.job import related_action
-from openerp.addons.connector.unit.synchronizer import Exporter
-from openerp.addons.connector.exception import RetryableJobError
+from odoo import _, exceptions
+from odoo.addons.queue_job.job import job
+from odoo.addons.queue_job.job import related_action
+from odoo.addons.connector.unit.synchronizer import Exporter
+from odoo.addons.connector.exception import RetryableJobError
 from .mapper import TranslationPrestashopExportMapper
 
 
@@ -41,6 +41,7 @@ class PrestashopBaseExporter(Exporter):
         """ Return the raw Odoo data for ``self.binding_id`` """
         return self.model.browse(self.binding_id)
 
+
     def run(self, binding_id, *args, **kwargs):
         """ Run the synchronization
 
@@ -48,13 +49,13 @@ class PrestashopBaseExporter(Exporter):
         """
         self.binding_id = binding_id
         self.binding = self._get_binding()
-        self.prestashop_id = self.binder.to_backend(self.binding)
+        self.prestashop_id = self.binder.to_external(self.binding)
         result = self._run(*args, **kwargs)
 
         self.binder.bind(self.prestashop_id, self.binding)
         # commit so we keep the external ID if several cascading exports
         # are called and one of them fails
-        self.session.commit()
+        # self.session.commit() -> session doesn't exists
         self._after_export()
         return result
 
@@ -206,7 +207,7 @@ class PrestashopExporter(PrestashopBaseExporter):
 
         rel_binder = self.binder_for(binding_model)
 
-        if not rel_binder.to_backend(binding) or force_sync:
+        if not rel_binder.to_external(binding) or force_sync:
             exporter = self.unit_for(
                 exporter_class or PrestashopExporter, binding_model)
             exporter.run(binding.id)
@@ -339,14 +340,14 @@ def related_action_record(session, job):
     }
     return action
 
-
 @job(default_channel='root.prestashop')
 @related_action(action=related_action_record)
 def export_record(session, model_name, binding_id, fields=None, **kwargs):
     """ Export a record on PrestaShop """
     # TODO: FIX PRESTASHOP do not support partial edit
     fields = None
-    record = session.env[model_name].browse(binding_id)
-    env = record.backend_id.get_environment(model_name, session=session)
+    record = session[model_name].browse(binding_id)
+    env = record.backend_id.get_environment(model_name)
     exporter = env.get_connector_unit(PrestashopExporter)
     return exporter.run(binding_id, fields=fields, **kwargs)
+

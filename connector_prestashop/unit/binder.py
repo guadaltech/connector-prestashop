@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from openerp.addons.connector.connector import Binder
+from odoo.addons.connector.connector import Binder
 from ..backend import prestashop
+from odoo import models
 
 
 @prestashop
@@ -42,3 +43,32 @@ class PrestashopBinder(Binder):
     def to_odoo(self, external_id, unwrap=False):
         # Make alias to to_openerp, remove in v10
         return self.to_openerp(external_id, unwrap)
+
+    def to_backend(self, binding_id, wrap=False):
+        """ Give the external ID for an OpenERP binding ID
+        :param binding_id: OpenERP binding ID for which we want the backend id
+        :param wrap: if False, binding_id is the ID of the binding,
+                     if True, binding_id is the ID of the normal record, the
+                     method will search the corresponding binding and returns
+                     the backend id of the binding
+        :return: external ID of the record
+        """
+        record = self.model.browse()
+        if isinstance(binding_id, models.BaseModel):
+            binding_id.ensure_one()
+            record = binding_id
+            binding_id = binding_id.id
+        if wrap:
+            binding = self.model.with_context(active_test=False).search(
+                [(self._openerp_field, '=', binding_id),
+                 (self._backend_field, '=', self.backend_record.id),
+                 ]
+            )
+            if not binding:
+                return None
+            binding.ensure_one()
+            return getattr(binding, self._external_field)
+        if not record:
+            record = self.model.browse(binding_id)
+        assert record
+        return getattr(record, self._external_field)

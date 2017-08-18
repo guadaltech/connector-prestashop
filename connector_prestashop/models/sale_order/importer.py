@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-from openerp import _, fields
-from openerp.addons.connector.queue.job import job
-from openerp.addons.connector.connector import ConnectorUnit
-from openerp.addons.connector.exception import FailedJobError, NothingToDoJob
-from openerp.addons.connector.unit.mapper import ImportMapper, mapping
-from openerp.addons.connector_ecommerce.unit.sale_order_onchange import (
+from odoo import _, fields, tools
+from odoo.addons.queue_job.job import job
+from odoo.addons.connector.connector import ConnectorUnit
+from odoo.addons.queue_job.exception import FailedJobError, NothingToDoJob
+from odoo.addons.connector.unit.mapper import ImportMapper, mapping
+from odoo.addons.connector_ecommerce.unit.sale_order_onchange import (
     SaleOrderOnChange,
 )
 from ...unit.backend_adapter import GenericAdapter
@@ -85,7 +85,10 @@ class SaleImportRule(ConnectorUnit):
         """
         ps_payment_method = record['payment']
         mode_binder = self.binder_for('account.payment.mode')
-        payment_mode = mode_binder.to_odoo(ps_payment_method)
+        if type(ps_payment_method) == str:
+            payment_mode = self.to_internal_account_payment_mode(ps_payment_method)
+        else:
+            payment_mode = mode_binder.to_internal(ps_payment_method)
         if not payment_mode:
             raise FailedJobError(_(
                 "The configuration is missing for the Payment Mode '%s'.\n\n"
@@ -116,6 +119,29 @@ class SaleImportRule(ConnectorUnit):
             raise NothingToDoJob('Import of the order %s canceled '
                                  'because it has not been paid since %d '
                                  'days' % (order_id, max_days))
+
+    def to_internal_account_payment_mode(self, external_id, unwrap=False):
+        """ Give the Odoo recordset for an external ID
+
+        :param external_id: external ID for which we want
+                            the Odoo ID
+        :param unwrap: if True, returns the normal record
+                       else return the binding record
+        :return: a recordset, depending on the value of unwrap,
+                 or an empty recordset if the external_id is not mapped
+        :rtype: recordset
+        """
+        bindings = self.env['account.payment.mode'].with_context(active_test=False).search(
+            [('name', '=', tools.ustr(external_id))]
+        )
+        if not bindings:
+            if unwrap:
+                return self.model.browse()[self._odoo_field]
+            return self.model.browse()
+        bindings.ensure_one()
+        if unwrap:
+            bindings = bindings[self._odoo_field]
+        return bindings
 
 
 @prestashop
@@ -199,19 +225,19 @@ class SaleOrderMapper(ImportMapper):
     @mapping
     def partner_id(self, record):
         binder = self.binder_for('prestashop.res.partner')
-        partner = binder.to_odoo(record['id_customer'], unwrap=True)
+        partner = binder.to_internal(record['id_customer'], unwrap=True)
         return {'partner_id': partner.id}
 
     @mapping
     def partner_invoice_id(self, record):
         binder = self.binder_for('prestashop.address')
-        address = binder.to_odoo(record['id_address_invoice'], unwrap=True)
+        address = binder.to_internal(record['id_address_invoice'], unwrap=True)
         return {'partner_invoice_id': address.id}
 
     @mapping
     def partner_shipping_id(self, record):
         binder = self.binder_for('prestashop.address')
-        shipping = binder.to_odoo(record['id_address_delivery'], unwrap=True)
+        shipping = binder.to_internal(record['id_address_delivery'], unwrap=True)
         return {'partner_shipping_id': shipping.id}
 
     @mapping
@@ -230,17 +256,43 @@ class SaleOrderMapper(ImportMapper):
     @mapping
     def payment(self, record):
         binder = self.binder_for('account.payment.mode')
-        mode = binder.to_odoo(record['payment'])
+        if type(record['payment']) != str:
+            mode = binder.to_internal(record['payment'])
+        else:
+            mode = self.to_internal_account_payment_mode_res(record['payment'])
         assert mode, ("import of error fail in SaleImportRule.check "
                       "when the payment mode is missing")
         return {'payment_mode_id': mode.id}
+
+    def to_internal_account_payment_mode_res(self, external_id, unwrap=False):
+        """ Give the Odoo recordset for an external ID
+
+        :param external_id: external ID for which we want
+                            the Odoo ID
+        :param unwrap: if True, returns the normal record
+                       else return the binding record
+        :return: a recordset, depending on the value of unwrap,
+                 or an empty recordset if the external_id is not mapped
+        :rtype: recordset
+        """
+        bindings = self.env['account.payment.mode'].with_context(active_test=False).search(
+            [('name', '=', tools.ustr(external_id))]
+        )
+        if not bindings:
+            if unwrap:
+                return self.model.browse()[self._odoo_field]
+            return self.model.browse()
+        bindings.ensure_one()
+        if unwrap:
+            bindings = bindings[self._odoo_field]
+        return bindings
 
     @mapping
     def carrier_id(self, record):
         if record['id_carrier'] == '0':
             return {}
         binder = self.binder_for('prestashop.delivery.carrier')
-        carrier = binder.to_odoo(record['id_carrier'], unwrap=True)
+        carrier = binder.to_internal(record['id_carrier'], unwrap=True)
         return {'carrier_id': carrier.id}
 
     @mapping
@@ -295,7 +347,8 @@ class SaleOrderImporter(PrestashopImporter):
                 # we ignore it, the order line will be imported without product
                 _logger.error('PrestaShop product %s could not be imported, '
                               'error: %s', row['product_id'], err)
-                self.line_template_errors.push(row)
+                self.line_template_errors.append(row)
+                print self.line_template_errors
 
     def _add_shipping_line(self, binding):
         shipping_total = (binding.total_shipping_tax_included
@@ -381,13 +434,13 @@ class SaleOrderLineMapper(ImportMapper):
             combination_binder = self.binder_for(
                 'prestashop.product.combination'
             )
-            product = combination_binder.to_odoo(
+            product = combination_binder.to_internal(
                 record['product_attribute_id'],
                 unwrap=True,
             )
         else:
             binder = self.binder_for('prestashop.product.template')
-            template = binder.to_odoo(record['product_id'], unwrap=True)
+            template = binder.to_internal(record['product_id'], unwrap=True)
             product = self.env['product.product'].search([
                 ('product_tmpl_id', '=', template.id),
                 ('company_id', '=', self.backend_record.company_id.id)],
@@ -402,7 +455,7 @@ class SaleOrderLineMapper(ImportMapper):
 
     def _find_tax(self, ps_tax_id):
         binder = self.binder_for('prestashop.account.tax')
-        return binder.to_odoo(ps_tax_id, unwrap=True)
+        return binder.to_internal(ps_tax_id, unwrap=True)
 
     @mapping
     def tax_id(self, record):

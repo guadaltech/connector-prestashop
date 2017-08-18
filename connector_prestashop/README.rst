@@ -19,7 +19,6 @@ to Odoo:
 * Carriers
 * Product categories
 * Products
-* Combinations of products
 * Partner categories
 * Customers
 
@@ -96,20 +95,7 @@ Steps in Odoo
   * PrestaShop - Import Products and Categories
   * PrestaShop - Import Sales Orders
   * PrestaShop - Import suppliers
-  * PrestaShop - Payment methods
 
-Usage
-=====
-
-To use this module, you need to:
-
-#. Go to *Connectors > Queue > Jobs*, and check the correct enqueuing of
-   the tasks.
-#. Check on each menu the resulting imported records (Customers, Sales
-   Orders...)
-
-.. image:: https://odoo-community.org/website/image/ir.attachment/5784_f2813bd/datas
-   :alt: Try me on Runbot
    :target: https://runbot.odoo-community.org/runbot/108/9.0
 
 Test dependencies
@@ -119,53 +105,8 @@ Extra libs are required to run the tests:
 * ``vcrpy``
 * ``freezegun``
 
-Known issues / Roadmap
-======================
+Todo
+=================
 
-* Work with multiple warehouses.
-* Tests.
+Product Images
 
-Bug Tracker
-===========
-
-Bugs are tracked on `GitHub Issues
-<https://github.com/OCA/connector-prestashop/issues>`_. In case of trouble, please
-check there if your issue has already been reported. If you spotted it first,
-help us smashing it by providing a detailed and welcomed feedback.
-
-Credits
-=======
-
-Images
-------
-
-* `PrestaShop logo <http://seeklogo.com/prestashop-logo-178788.html>`_.
-* `Odoo logo <https://www.odoo.com/es_ES/page/brand-assets>`_.
-* `Cable <https://openclipart.org/detail/174134/cable-with-connector>`_.
-
-Contributors
-------------
-
-* Sébastien Beau <sebastien.beau@akretion.com>
-* Benoît Guillot <benoit.guillot@akretion.com>
-* Alexis de Lattre <alexis.delattre@akretion.com>
-* Guewen Baconnier <guewen.baconnier@camptocamp.com>
-* Sergio Teruel <sergio.teruel@tecnativa.com>
-* Mikel Arregi <mikelarregi@avanzosc.es>
-* Pedro M. Baeza <pedro.baeza@tecnativa.com>
-* Simone Orsi <simone.orsi@camptocamp.com>
-
-Maintainer
-----------
-
-.. image:: https://odoo-community.org/logo.png
-   :alt: Odoo Community Association
-   :target: https://odoo-community.org
-
-This module is maintained by the OCA.
-
-OCA, or the Odoo Community Association, is a nonprofit organization whose
-mission is to support the collaborative development of Odoo features and
-promote its widespread use.
-
-To contribute to this module, please visit https://odoo-community.org.

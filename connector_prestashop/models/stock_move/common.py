@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from openerp import api, fields, models
+from odoo import api, fields, models
 
 
 class StockLocation(models.Model):
@@ -42,7 +42,10 @@ class StockQuant(models.Model):
             if location in ps_locations:
                 quant.invalidate_cache()
                 quant.product_id.update_prestashop_qty()
-        return res
+        if len(self) != 0:
+            return res
+        else:
+            return True
 
     @api.multi
     def unlink(self):

@@ -3,22 +3,20 @@
 # Copyright 2011-2013 Akretion
 # Copyright 2015 AvanzOSC
 # Copyright 2015-2016 Tecnativa
+# Copyright 2017 Guadaltech
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 {
     "name": "PrestaShop-Odoo connector",
-    "version": "9.0.1.0.3",
+    "version": "10.0.1.0.0",
     "license": "AGPL-3",
     "depends": [
         "account",
         "product",
         "product_multi_category",  # oca/product-attribute
         "connector_ecommerce",  # oca/connector-ecommerce
-        "product_multi_image",  # oca/product-attribute
         "purchase",
         "product_variant_supplierinfo",  # oca/product-variant
-        # TODO: perhaps not needed:
-        # "product_variant_cost_price",  # oca/product-variant
     ],
     "external_dependencies": {
         'python': [
@@ -34,8 +32,8 @@
               "Camptocamp,"
               "AvanzOSC,"
               "Tecnativa,"
+              "Guadaltech,"
               "Odoo Community Association (OCA)",
-    "website": "https://github.com/OCA/connector-prestashop",
     "category": "Connector",
     'demo': [
         'demo/backend.xml',
@@ -55,8 +53,8 @@
         'views/stock_view.xml',
         'security/ir.model.access.csv',
         'security/prestashop_security.xml',
-        'data/ecommerce_data.xml',
+        # 'data/ecommerce_data.xml',
     ],
-    'installable': False,
+    'installable': True,
     "application": True,
 }

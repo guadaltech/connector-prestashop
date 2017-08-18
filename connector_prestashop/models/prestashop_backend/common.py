@@ -2,11 +2,11 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 import logging
+from contextlib import contextmanager
 
-from openerp import models, fields, api, exceptions, _
+from odoo import models, fields, api, exceptions, _
 
-from openerp.addons.connector.connector import ConnectorEnvironment
-from openerp.addons.connector.session import ConnectorSession
+from odoo.addons.connector.connector import ConnectorEnvironment
 from ...unit.importer import import_batch, import_record
 from ...unit.auto_matching_importer import AutoMatchingImporter
 from ...unit.backend_adapter import GenericAdapter, api_handle_errors
@@ -121,29 +121,25 @@ class PrestashopBackend(models.Model):
         return self.env['product.pricelist'].search([], limit=1)
 
     @api.multi
-    def get_environment(self, model_name, session=None):
+    def get_environment(self, model_name,):
         self.ensure_one()
-        if not session:
-            session = ConnectorSession.from_env(self.env)
-        return ConnectorEnvironment(self, session, model_name)
+        return ConnectorEnvironment(self, model_name)
 
     @api.multi
     def synchronize_metadata(self):
-        session = ConnectorSession.from_env(self.env)
         for backend in self:
-            for model in [
+            for model_name in [
                 'prestashop.shop.group',
                 'prestashop.shop'
             ]:
                 # import directly, do not delay because this
                 # is a fast operation, a direct return is fine
                 # and it is simpler to import them sequentially
-                import_batch(session, model, backend.id)
+                self.env[model_name].import_batch(backend=backend)
         return True
 
     @api.multi
     def synchronize_basedata(self):
-        session = ConnectorSession.from_env(self.env)
         for backend in self:
             for model_name in [
                 'prestashop.res.lang',
@@ -151,12 +147,13 @@ class PrestashopBackend(models.Model):
                 'prestashop.res.currency',
                 'prestashop.account.tax',
             ]:
-                env = backend.get_environment(model_name, session=session)
+                env = backend.get_environment(model_name)
                 importer = env.get_connector_unit(AutoMatchingImporter)
                 importer.run()
-
-            import_batch(session, 'prestashop.account.tax.group', backend.id)
-            import_batch(session, 'prestashop.sale.order.state', backend.id)
+            self.env['prestashop.account.tax.group'].import_batch(
+                backend=backend)
+            self.env['prestashop.sale.order.state'].import_batch(
+                backend=backend)
         return True
 
     @api.multi
@@ -174,84 +171,70 @@ class PrestashopBackend(models.Model):
 
     @api.multi
     def import_customers_since(self):
-        session = ConnectorSession.from_env(self.env)
         for backend_record in self:
+            connector_env = backend_record.get_environment('res.partner')
             since_date = backend_record.import_partners_since
-            import_customers_since.delay(
-                session,
-                backend_record.id,
-                since_date=since_date,
-                priority=10,
-            )
+            connector_env.env['res.partner'].with_delay(
+                priority=10
+            ).import_customers_since(
+                backend_record=backend_record, since_date=since_date)
         return True
 
     @api.multi
     def import_products(self):
-        session = ConnectorSession.from_env(self.env)
         for backend_record in self:
             since_date = backend_record.import_products_since
-            import_products.delay(
-                session,
-                backend_record.id,
-                since_date,
-                priority=10)
+            backend_record.env['prestashop.product.template'].with_delay(
+                priority=10).import_products(backend_record, since_date)
         return True
 
     @api.multi
     def import_carriers(self):
-        session = ConnectorSession.from_env(self.env)
         for backend_record in self:
-            import_carriers.delay(session, backend_record.id, priority=10)
+            self.env['prestashop.delivery.carrier'].with_delay(priority=15).import_batch(
+                backend=backend_record)
         return True
 
     @api.multi
     def update_product_stock_qty(self):
-        session = ConnectorSession.from_env(self.env)
         for backend_record in self:
-            export_product_quantities.delay(session, backend_record.id)
+            backend_record.env['prestashop.product.template']\
+                .with_delay().export_product_quantities(backend=backend_record)
+            backend_record.env['prestashop.product.combination']\
+                .with_delay().export_product_quantities(backend=backend_record)
         return True
 
     @api.multi
     def import_stock_qty(self):
-        session = ConnectorSession.from_env(self.env)
         for backend_record in self:
-            import_inventory.delay(session, backend_record.id)
+            backend_record.env['prestashop.product.template'].import_batch(backend=backend_record)
+        return True
 
     @api.multi
     def import_sale_orders(self):
-        session = ConnectorSession.from_env(self.env)
         for backend_record in self:
             since_date = backend_record.import_orders_since
-            import_orders_since.delay(
-                session,
-                backend_record.id,
-                since_date,
-                priority=5,
-            )
+            self.env['prestashop.sale.order'].with_delay(priority=5).import_batch(backend=backend_record, since_date=since_date)
         return True
 
     @api.multi
     def import_payment_modes(self):
-        session = ConnectorSession.from_env(self.env)
         for backend_record in self:
-            import_batch.delay(session, 'account.payment.mode',
-                               backend_record.id)
+            self.env['prestashop.sale.order'].import_batch(backend=backend_record)
         return True
 
     @api.multi
     def import_refunds(self):
-        session = ConnectorSession.from_env(self.env)
         for backend_record in self:
             since_date = backend_record.import_refunds_since
-            import_refunds.delay(session, backend_record.id, since_date)
+            self.env['prestashop.refund'].with_delay(priority=15).import_batch(backend=backend_record, since_date=since_date)
         return True
 
     @api.multi
     def import_suppliers(self):
-        session = ConnectorSession.from_env(self.env)
         for backend_record in self:
-            since_date = backend_record.import_suppliers_since
-            import_suppliers.delay(session, backend_record.id, since_date)
+            self.env['prestashop.supplier'].with_delay(priority=15).import_batch(
+                backend=backend_record)
         return True
 
     def get_version_ps_key(self, key):
