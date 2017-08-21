@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from openerp import models, fields, api
+from odoo import models, fields, api
 import unicodedata
 import re
 
@@ -82,12 +82,6 @@ class ExportMultipleProducts(models.TransientModel):
         for product in product_obj.browse(self.env.context['active_ids']):
             self._set_main_category(product)
 
-    def _check_images(self, product):
-        for variant in product.product_variant_ids:
-            for image in variant.image_ids:
-                if image.owner_id != product.id:
-                    image.product_id = product
-
     def _check_category(self, product):
         if not (product.categ_ids):
             return False
@@ -133,7 +127,6 @@ class ExportMultipleProducts(models.TransientModel):
                 ('default_shop_id', '=', self.shop_id.id),
             ])
             if not presta_tmpl:
-                self._check_images(product)
                 cat = self._check_category(product)
                 var = self._check_variants(product)
                 if not(var and cat):

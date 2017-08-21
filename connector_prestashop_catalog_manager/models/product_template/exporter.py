@@ -3,19 +3,19 @@
 
 from datetime import timedelta
 
-from openerp.addons.connector.unit.mapper import mapping, m2o_to_backend
+from odoo.addons.connector.unit.mapper import mapping, m2o_to_external
 
-from openerp.addons.connector_prestashop.\
+from odoo.addons.connector_prestashop.\
     models.product_template.importer import ProductTemplateImporter
 
-from openerp.addons.connector_prestashop.unit.exporter import (
+from odoo.addons.connector_prestashop.unit.exporter import (
     export_record,
     TranslationPrestashopExporter
 )
-from openerp.addons.connector_prestashop.unit.mapper import (
-    TranslationPrestashopExportMapper,
+from odoo.addons.connector_prestashop.unit.mapper import (
+    TranslationPrestashopExportMapper
 )
-from openerp.addons.connector_prestashop.backend import prestashop
+from odoo.addons.connector_prestashop.backend import prestashop
 from ...consumer import get_slug
 
 
@@ -32,7 +32,6 @@ class ProductTemplateExporter(TranslationPrestashopExporter):
         """ Update an Prestashop record """
         assert self.prestashop_id
         self.export_variants()
-        self.check_images()
         self.backend_adapter.write(self.prestashop_id, data)
 
     def write_binging_vals(self, erp_record, ps_record):
@@ -58,7 +57,7 @@ class ProductTemplateExporter(TranslationPrestashopExporter):
         if ext_id:
             return ext_id
 
-        ps_categ_obj = self.session.env['prestashop.product.category']
+        ps_categ_obj = self.env['prestashop.product.category']
         position_cat_id = ps_categ_obj.search(
             [], order='position desc', limit=1)
         obj_position = position_cat_id.position + 1
@@ -71,7 +70,7 @@ class ProductTemplateExporter(TranslationPrestashopExporter):
         binding = ps_categ_obj.with_context(
             connector_no_export=True).create(res)
         export_record(
-            self.session,
+            self.env,
             'prestashop.product.category',
             binding.id)
 
@@ -106,7 +105,7 @@ class ProductTemplateExporter(TranslationPrestashopExporter):
                         value, 'prestashop.product.combination.option.value')
 
     def export_variants(self):
-        combination_obj = self.session.env['prestashop.product.combination']
+        combination_obj = self.env['prestashop.product.combination']
         for product in self.binding.product_variant_ids:
             if not product.attribute_value_ids:
                 continue
@@ -117,16 +116,16 @@ class ProductTemplateExporter(TranslationPrestashopExporter):
             if not combination_ext_id:
                 combination_ext_id = combination_obj.with_context(
                     connector_no_export=True).create({
-                        'backend_id': self.backend_record.id,
-                        'odoo_id': product.id,
-                        'main_template_id': self.binding_id,
-                    })
+                    'backend_id': self.backend_record.id,
+                    'odoo_id': product.id,
+                    'main_template_id': self.binding_id,
+                })
             # If a template has been modified then always update PrestaShop
             # combinations
-            export_record.delay(
-                self.session,
+            export_record(
+                self.env,
                 'prestashop.product.combination',
-                combination_ext_id.id, priority=50,
+                combination_ext_id.id,
                 eta=timedelta(seconds=20))
 
     def _not_in_variant_images(self, image):
@@ -136,36 +135,12 @@ class ProductTemplateExporter(TranslationPrestashopExporter):
                 images.extend(product.image_ids.ids)
         return image.id not in images
 
-    def check_images(self):
-        if self.binding.image_ids:
-            image_binder = self.binder_for('prestashop.product.image')
-            for image in self.binding.image_ids:
-                image_ext_id = image_binder.to_backend(image.id, wrap=True)
-                # `image_ext_id` is ZERO as long as the image is not exported.
-                # Here we delay the export so,
-                # if we don't check this we create 2 records to be sync'ed
-                # and this leads to:
-                # ValueError:
-                #   Expected singleton: prestashop.product.image(x, y)
-                if image_ext_id is None:
-                    image_ext_id = self.session.env[
-                        'prestashop.product.image'].with_context(
-                        connector_no_export=True).create({
-                            'backend_id': self.backend_record.id,
-                            'odoo_id': image.id,
-                        })
-                    export_record.delay(
-                        self.session,
-                        'prestashop.product.image',
-                        image_ext_id.id, priority=15)
-
     def update_quantities(self):
         if len(self.binding.product_variant_ids) == 1:
             product = self.binding.odoo_id.product_variant_ids[0]
             product.update_prestashop_quantities()
 
     def _after_export(self):
-        self.check_images()
         self.export_variants()
         self.update_quantities()
 
@@ -180,13 +155,13 @@ class ProductTemplateExportMapper(TranslationPrestashopExportMapper):
         ('online_only', 'online_only'),
         ('weight', 'weight'),
         ('standard_price', 'wholesale_price'),
-        (m2o_to_backend('default_shop_id'), 'id_shop_default'),
+        (m2o_to_external('default_shop_id'), 'id_shop_default'),
         ('always_available', 'active'),
         ('barcode', 'barcode'),
         ('additional_shipping_cost', 'additional_shipping_cost'),
         ('minimal_quantity', 'minimal_quantity'),
         ('on_sale', 'on_sale'),
-        (m2o_to_backend(
+        (m2o_to_external(
             'prestashop_default_category_id',
             binding='prestashop.product.category'), 'id_category_default'),
     ]
@@ -260,31 +235,3 @@ class ProductTemplateExportMapper(TranslationPrestashopExportMapper):
     def date_add(self, record):
         # When export a record the date_add in PS is null.
         return {'date_add': record.create_date}
-
-    @mapping
-    def default_image(self, record):
-        default_image = record.image_ids.filtered('front_image')[:1]
-        if default_image:
-            binder = self.binder_for('prestashop.product.image')
-            ps_image_id = binder.to_backend(default_image, wrap=True)
-            if ps_image_id:
-                return {'id_default_image': ps_image_id}
-
-    @mapping
-    def extras_manufacturer(self, record):
-        mapper = self.unit_for(ManufacturerExportMapper)
-        return mapper.map_record(record).values(**self.options)
-
-
-@prestashop
-class ManufacturerExportMapper(TranslationPrestashopExportMapper):
-    # To extend in connector_prestashop_manufacturer module
-    _model_name = 'prestashop.product.template'
-
-    _translatable_fields = [
-        ('name', 'name'),
-    ]
-
-    @mapping
-    def manufacturer(self, record):
-        return {}

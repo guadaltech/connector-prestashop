@@ -3,6 +3,7 @@
 # Copyright 2011-2013 Akretion
 # Copyright 2015 AvanzOSC
 # Copyright 2015-2016 Tecnativa
+# Copyright 2017 Guadaltech
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 {
@@ -16,8 +17,8 @@
               "AvanzOSC,"
               "Tecnativa,"
               'Camptocamp SA,'
+              'Guadaltech,'
               "Odoo Community Association (OCA)",
-    "website": "https://github.com/OCA/connector-prestashop",
     "category": "Connector",
     "data": [
         'views/product_attribute_view.xml',
@@ -28,5 +29,5 @@
         'wizards/active_deactive_products_view.xml',
         'views/product_image_view.xml',
     ],
-    'installable': False,
+    'installable': True,
 }

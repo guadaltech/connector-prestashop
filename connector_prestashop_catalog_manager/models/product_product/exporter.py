@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from openerp.addons.connector.unit.mapper import mapping
+from odoo.addons.connector.unit.mapper import mapping
 
-from openerp.addons.connector_prestashop.unit.exporter import (
+from odoo.addons.connector_prestashop.unit.exporter import (
     TranslationPrestashopExporter,
     export_record,
     PrestashopExporter,
 )
-from openerp.addons.connector_prestashop.unit.mapper import \
+from odoo.addons.connector_prestashop.unit.mapper import \
     TranslationPrestashopExportMapper
-from openerp.addons.connector_prestashop.backend import prestashop
+from odoo.addons.connector_prestashop.backend import prestashop
 from collections import OrderedDict
 import logging
 
@@ -152,25 +152,14 @@ class ProductCombinationExportMapper(TranslationPrestashopExportMapper):
                 option_value.append({'id': value_ext_id})
         return option_value
 
-    def _get_combination_image(self, record):
-        images = []
-        image_binder = self.binder_for('prestashop.product.image')
-        for image in record.image_ids:
-            image_ext_id = image_binder.to_backend(image.id, wrap=True)
-            if image_ext_id:
-                images.append({'id': image_ext_id})
-        return images
-
     @mapping
     def associations(self, record):
         associations = OrderedDict([
             ('product_option_values',
-                {'product_option_value':
-                 self._get_product_option_value(record)}),
-            ('images', {'image': self._get_combination_image(record) or False})
+             {'product_option_value':
+                  self._get_product_option_value(record)})
         ])
         return {'associations': associations}
-
 
 @prestashop
 class ProductCombinationOptionExport(PrestashopExporter):

@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from openerp.addons.connector.unit.mapper import mapping
+from odoo.addons.connector.unit.mapper import mapping
 
-from openerp.addons.connector_prestashop.unit.exporter import (
+from odoo.addons.connector_prestashop.unit.exporter import (
     PrestashopExporter,
     export_record,
 )
-from openerp.addons.connector_prestashop.unit.mapper import (
-    TranslationPrestashopExportMapper,
+from odoo.addons.connector_prestashop.unit.mapper import (
+    TranslationPrestashopExportMapper
 )
 from ...consumer import get_slug
-from openerp.addons.connector_prestashop.backend import prestashop
-
+from odoo.addons.connector_prestashop.backend import prestashop
 
 @prestashop
 class ProductCategoryExporter(PrestashopExporter):
@@ -21,7 +20,7 @@ class ProductCategoryExporter(PrestashopExporter):
     def _export_dependencies(self):
         """ Export the dependencies for the category"""
         category_binder = self.binder_for('prestashop.product.category')
-        categories_obj = self.session.env['prestashop.product.category']
+        categories_obj = self.env['prestashop.product.category']
         for category in self.binding:
             self.export_parent_category(
                 category.odoo_id.parent_id, category_binder, categories_obj)
@@ -42,7 +41,6 @@ class ProductCategoryExporter(PrestashopExporter):
         parent_cat_id = export_record(
             self.session, 'prestashop.product.category', category_ext_id.id)
         return parent_cat_id
-
 
 @prestashop
 class ProductCategoryExportMapper(TranslationPrestashopExportMapper):
