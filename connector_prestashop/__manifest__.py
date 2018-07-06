@@ -17,6 +17,7 @@
         "connector_ecommerce",  # oca/connector-ecommerce
         "purchase",
         "product_variant_supplierinfo",  # oca/product-variant
+        "base_multi_image", # oca/server-tools
     ],
     "external_dependencies": {
         'python': [
